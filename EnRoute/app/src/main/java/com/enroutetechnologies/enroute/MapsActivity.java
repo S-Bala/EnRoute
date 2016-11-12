@@ -56,13 +56,13 @@ public class MapsActivity extends AppCompatActivity
     private EditText mTo;
     private EditText mSearch;
     private SupportMapFragment mMapFragment;
-    private HTTPSRequest mHTTPSRequest;
+    private GMapV2Direction mGMapV2Direction;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
-        mHTTPSRequest = new HTTPSRequest(this);
+        mGMapV2Direction = new GMapV2Direction();
 
         mFrom = (EditText)findViewById(R.id.from);
         mTo = (EditText)findViewById(R.id.to);
@@ -88,7 +88,6 @@ public class MapsActivity extends AppCompatActivity
                     break;
                 case R.id.search:
                     txtnumber = 2;
-                    mHTTPSRequest.sendRequest("fdsfd");
                     break;
             }
             autoComplete();

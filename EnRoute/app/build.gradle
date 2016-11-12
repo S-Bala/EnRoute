@@ -1,6 +1,7 @@
 apply plugin: 'com.android.application'
 
 android {
+    useLibrary 'org.apache.http.legacy'
     compileSdkVersion 25
     buildToolsVersion "24.0.2"
     defaultConfig {
@@ -28,6 +29,6 @@ dependencies {
     compile 'com.google.android.gms:play-services-maps:9.8.0'
     compile 'com.google.android.gms:play-services:9.8.0'
     compile 'com.android.volley:volley:1.0.0'
-    compile 'org.apache.httpcomponents:httpclient:4.5'
+//    compile 'org.apache.httpcomponents:httpclient:4.5'
     testCompile 'junit:junit:4.12'
 }
