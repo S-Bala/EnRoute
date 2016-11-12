@@ -5,6 +5,7 @@ package com.enroutetechnologies.enroute;
  */
 
 import java.io.InputStream;
+import java.io.StringReader;
 import java.util.ArrayList;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -19,6 +20,7 @@ import org.apache.http.protocol.HttpContext;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 
 import com.google.android.gms.maps.model.LatLng;
 
@@ -32,21 +34,24 @@ public class GMapV2Direction {
     public GMapV2Direction() {
     }
 
-    public Document getDocument(LatLng start, LatLng end, String mode) {
-        String url = "http://maps.googleapis.com/maps/api/directions/xml?"
-                + "origin=" + start.latitude + "," + start.longitude
-                + "&destination=" + end.latitude + "," + end.longitude
-                + "&sensor=false&units=metric&mode=driving";
-        Log.d("url", url);
+    public Document getDocument(String response) {
+//        String url = "http://maps.googleapis.com/maps/api/directions/xml?"
+//                + "origin=" + start.latitude + "," + start.longitude
+//                + "&destination=" + end.latitude + "," + end.longitude
+//                + "&sensor=false&units=metric&mode=driving";
+//        Log.d("url", url);
         try {
-            HttpClient httpClient = new DefaultHttpClient();
-            HttpContext localContext = new BasicHttpContext();
-            HttpPost httpPost = new HttpPost(url);
-            HttpResponse response = httpClient.execute(httpPost, localContext);
-            InputStream in = response.getEntity().getContent();
-            DocumentBuilder builder = DocumentBuilderFactory.newInstance()
-                    .newDocumentBuilder();
-            Document doc = builder.parse(in);
+//            HttpClient httpClient = new DefaultHttpClient();
+//            HttpContext localContext = new BasicHttpContext();
+//            HttpPost httpPost = new HttpPost(url);
+//            HttpResponse response = httpClient.execute(httpPost, localContext);
+//            InputStream in = response.getEntity().getContent();
+//            DocumentBuilder builder = DocumentBuilderFactory.newInstance()
+//                    .newDocumentBuilder();
+//            Document doc = builder.parse(in);
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(new InputSource(new StringReader(response)));
             return doc;
         } catch (Exception e) {
             e.printStackTrace();

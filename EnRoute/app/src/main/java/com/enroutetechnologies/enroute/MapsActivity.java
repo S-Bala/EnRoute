@@ -25,12 +25,16 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 import java.util.ArrayList;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.w3c.dom.Document;
 
 import static com.enroutetechnologies.enroute.R.id.map;
@@ -39,7 +43,8 @@ public class MapsActivity extends AppCompatActivity
         implements
         OnMyLocationButtonClickListener,
         OnMapReadyCallback,
-        ActivityCompat.OnRequestPermissionsResultCallback {
+        ActivityCompat.OnRequestPermissionsResultCallback,
+        HTTPSRequest.Listener{
 
     /**
      * Request code for location permission request.
@@ -69,12 +74,13 @@ public class MapsActivity extends AppCompatActivity
     private Place mToPlace;
     private Button mButton;
     private Document mDocument;
+    private HTTPSRequest mHTTPSRequest;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
         mGMapV2Direction = new GMapV2Direction();
-
+        mHTTPSRequest = new HTTPSRequest(this,this);
         mFrom = (EditText)findViewById(R.id.from);
         mTo = (EditText)findViewById(R.id.to);
         mSearch = (EditText)findViewById(R.id.search);
@@ -106,14 +112,24 @@ public class MapsActivity extends AppCompatActivity
                     break;
                 case R.id.submit:
                     if(mFromPlace != null && mToPlace != null){
+                        mHTTPSRequest.getRequest(getURL(mFromPlace.getLatLng(),mToPlace.getLatLng(),"xml"));
+                        mHTTPSRequest.getRequest(getURL(mFromPlace.getLatLng(),mToPlace.getLatLng(),"json"));
 //                        mDocument = mGMapV2Direction.getDocument(mFromPlace.getLatLng(),mToPlace.getLatLng(),mGMapV2Direction.MODE_DRIVING);
-                        mapDirection();
+//                        mapDirection();
                     }
                     break;
             }
         }
     };
 
+    public String getURL(LatLng start, LatLng end, String type){
+        String url = "http://maps.googleapis.com/maps/api/directions/"+ type +"?"
+                + "origin=" + start.latitude + "," + start.longitude
+                + "&destination=" + end.latitude + "," + end.longitude
+                + "&sensor=false&units=metric&mode=driving";
+        return url;
+
+    }
     public void autoComplete(){
         try {
             Intent intent =
@@ -127,9 +143,8 @@ public class MapsActivity extends AppCompatActivity
         }
     }
 
-    private void mapDirection(){
-        Document doc = mGMapV2Direction.getDocument(mFromPlace.getLatLng(), mToPlace.getLatLng(),
-                GMapV2Direction.MODE_DRIVING);
+    private void mapDirection(String response){
+        Document doc = mGMapV2Direction.getDocument(response);
 
         ArrayList<LatLng> directionPoint = mGMapV2Direction.getDirection(doc);
         PolylineOptions rectLine = new PolylineOptions().width(3).color(R.color.Red);
@@ -148,7 +163,7 @@ public class MapsActivity extends AppCompatActivity
                 if (txtnumber == 0){
                     mFromPlace = place;
                     mFrom.setText(mFromPlace.getName());
-                } else {
+                } else if (txtnumber == 1){
                     mToPlace = place;
                     mTo.setText(mToPlace.getName());
                 }
@@ -235,4 +250,33 @@ public class MapsActivity extends AppCompatActivity
                 .newInstance(true).show(getSupportFragmentManager(), "dialog");
     }
 
+    @Override
+    public void requestSuccess(String response) {
+        Log.i("Response", response);
+        if (isJSONValid(response)){
+
+        } else {
+            mapDirection(response);
+        }
+    }
+
+    @Override
+    public void requestFailure(String response) {
+
+    }
+
+    public boolean isJSONValid(String test) {
+        try {
+            new JSONObject(test);
+        } catch (JSONException ex) {
+            // edited, to include @Arthur's comment
+            // e.g. in case JSONArray is valid as well...
+            try {
+                new JSONArray(test);
+            } catch (JSONException ex1) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
