@@ -21,6 +21,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 
+import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.location.LocationManager;
 
@@ -197,9 +198,15 @@ public class MapsActivity extends AppCompatActivity
             e.printStackTrace();
         }
 
-        final Timer timer = new Timer();
+        final ProgressDialog dialog = new ProgressDialog(MapsActivity.this);
+        dialog.setTitle("Loading...");
+        dialog.setMessage("Please wait.");
+        dialog.setIndeterminate(true);
+        dialog.setCancelable(false);
+        dialog.show();
 
-        final TimerTask task = new TimerTask() {
+        final Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
             @Override
             public void run() {
                 while(yelpConnection.counter < 21){
@@ -209,10 +216,9 @@ public class MapsActivity extends AppCompatActivity
                 addPOI();
                 timer.cancel();
                 timer.purge();
+                dialog.dismiss();
             }
-        };
-
-        timer.schedule(task,500);
+        }, 1000);
 
         PolylineOptions rectLine = new PolylineOptions().width(10).color(Color.BLUE);
 
