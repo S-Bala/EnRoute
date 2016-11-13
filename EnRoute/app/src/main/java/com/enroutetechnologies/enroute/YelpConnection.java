@@ -40,18 +40,18 @@ public class YelpConnection {
 
         ArrayList mCleanData = getCleanData(directionPoint);
 
+        Map<String, String> params = new HashMap<>();
+
+        // general search params
+        params.put("term", searchItem);
+        params.put("limit", "3");
+        params.put("radius_filter", String.valueOf(radius));
+
         for(int i = 0; i < mCleanData.size(); i++){
 
             final LatLng record = (LatLng) mCleanData.get(i);
             double latitude = record.latitude;
             double longitude = record.longitude;
-
-            Map<String, String> params = new HashMap<>();
-
-            // general search params
-            params.put("term", searchItem);
-            params.put("limit", "5");
-            params.put("radius_filter", String.valueOf(radius));
 
             // set up location boundary
             CoordinateOptions coordinate = CoordinateOptions.builder()

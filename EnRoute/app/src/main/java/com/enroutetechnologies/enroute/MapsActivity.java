@@ -190,7 +190,7 @@ public class MapsActivity extends AppCompatActivity
         yelpConnection = new YelpConnection();
         String searchItem = mSearch.getText().toString();
         try {
-            yelpPointsofInterests = yelpConnection.getPointsOfInterests(searchItem, directionPoint, 2000);
+            yelpPointsofInterests = yelpConnection.getPointsOfInterests(searchItem, directionPoint, 1000);
         } catch (IOException e) {
             e.printStackTrace();
         }
