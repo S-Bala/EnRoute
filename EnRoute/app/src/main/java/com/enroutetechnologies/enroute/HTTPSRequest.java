@@ -1,6 +1,7 @@
 package com.enroutetechnologies.enroute;
 
 import android.content.Context;
+import android.content.DialogInterface;
 
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -21,7 +22,7 @@ public class HTTPSRequest {
         mContext = context;
     }
 
-    public void getRequest(String url){
+    public void getRequest(String url, final DialogInterface dialog){
         // Instantiate the RequestQueue.
         RequestQueue queue = Volley.newRequestQueue(mContext);
 
@@ -30,12 +31,14 @@ public class HTTPSRequest {
                 new Response.Listener<String>() {
                     @Override
                     public void onResponse(String response) {
+                        dialog.cancel();
                         mListener.requestSuccess(response);
                         // Display the first 500 characters of the response string.
                     }
                 }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
+                dialog.cancel();
                 mListener.requestFailure(error.toString());
             }
         });
