@@ -12,6 +12,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMap.OnMyLocationButtonClickListener;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
@@ -100,6 +101,8 @@ public class MapsActivity extends AppCompatActivity
     private Button mButton;
     private HTTPSRequest mHTTPSRequest;
     private YelpConnection yelpConnection;
+    private ArrayList<PointOfInterest> mPointOfInterest = new ArrayList<>();
+    private Integer mCounter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -202,7 +205,8 @@ public class MapsActivity extends AppCompatActivity
                 while(yelpConnection.counter < 21){
                     Log.e("id",Integer.toString(yelpConnection.counter));
                 }
-                ArrayList<PointOfInterest> pointOfInterestsArray = yelpConnection.getPointsOfInterests();
+                mPointOfInterest = yelpConnection.getPointsOfInterests();
+                addPOI();
                 timer.cancel();
                 timer.purge();
             }
@@ -217,6 +221,32 @@ public class MapsActivity extends AppCompatActivity
         }
         Polyline polylin = mMap.addPolyline(rectLine);
         zoomFunction();
+    }
+
+    public void addPOI(){
+        new Thread() {
+            public void run() {
+                mCounter = 0;
+                while (mCounter < mPointOfInterest.size()) {
+                    try {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                for (PointOfInterest elements: mPointOfInterest){
+                                    mCounter = mCounter + 1;
+                                    LatLng latlang = new LatLng(elements.getLatitude(),elements.getLongitude());
+                                    mMarkers.add(mMap.addMarker(new MarkerOptions().position(latlang).title(elements.getName())
+                                            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))));
+                                }
+                            }
+                        });
+                        Thread.sleep(300);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }.start();
     }
 
     public void zoomFunction(){
