@@ -48,7 +48,7 @@ public class PointOfInterest {
         return imageURL;
     }
 
-    public Boolean getClosed() {
+    public boolean getClosed() {
         return isClosed;
     }
 
@@ -56,15 +56,15 @@ public class PointOfInterest {
         return location.displayAddress();
     }
 
-    public Double getLatitude() {
+    public double getLatitude() {
         return coordinate.latitude();
     }
 
-    public Double getLongitude() {
+    public double getLongitude() {
         return coordinate.longitude();
     }
 
-    public Double getRating() {
+    public double getRating() {
         return rating;
     }
 
