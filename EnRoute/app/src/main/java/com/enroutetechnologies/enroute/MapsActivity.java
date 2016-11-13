@@ -3,6 +3,7 @@ package com.enroutetechnologies.enroute;
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
 import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.ui.PlaceAutocomplete;
 import com.google.android.gms.maps.CameraUpdate;
@@ -13,18 +14,31 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 
+import android.content.DialogInterface;
+import android.location.LocationManager;
+
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationManager;
+import android.provider.DocumentsContract;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
+import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.Menu;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -40,6 +54,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.w3c.dom.Document;
 
+import static android.R.attr.width;
 import static com.enroutetechnologies.enroute.R.id.map;
 
 public class MapsActivity extends AppCompatActivity
@@ -47,7 +62,9 @@ public class MapsActivity extends AppCompatActivity
         OnMyLocationButtonClickListener,
         OnMapReadyCallback,
         ActivityCompat.OnRequestPermissionsResultCallback,
-        HTTPSRequest.Listener{
+        HTTPSRequest.Listener,
+        FormFragment.Listener,
+        android.location.LocationListener {
 
     /**
      * Request code for location permission request.
@@ -56,6 +73,8 @@ public class MapsActivity extends AppCompatActivity
      */
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
 
+    private ArrayList<Marker> mMarkers = new ArrayList<>();
+
     /**
      * Flag indicating whether a requested permission has been denied after returning in
      * {@link #onRequestPermissionsResult(int, String[], int[])}.
@@ -63,6 +82,9 @@ public class MapsActivity extends AppCompatActivity
     private boolean mPermissionDenied = false;
 
     private static final int PLACE_AUTOCOMPLETE_REQUEST_CODE = 1;
+
+    LocationManager locationManager;
+    String locationProvider;
 
     private int txtnumber = 0;
 
@@ -83,61 +105,73 @@ public class MapsActivity extends AppCompatActivity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
+        if (savedInstanceState == null) {showDialog();}
         mGMapV2Direction = new GMapV2Direction();
-        mHTTPSRequest = new HTTPSRequest(this,this);
-        mFrom = (EditText)findViewById(R.id.from);
-        mTo = (EditText)findViewById(R.id.to);
-        mSearch = (EditText)findViewById(R.id.search);
-        mButton = (Button)findViewById(R.id.submit);
-
-        mFrom.setOnClickListener(onClickListener);
-        mTo.setOnClickListener(onClickListener);
-        mSearch.setOnClickListener(onClickListener);
-        mButton.setOnClickListener(onClickListener);
-
+        mHTTPSRequest = new HTTPSRequest(this, this);
         mMapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(map);
         mMapFragment.getMapAsync(this);
+        this.initializeLocationManager();
+
+
+        // Find the toolbar view inside the activity layout
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        // Sets the Toolbar to act as the ActionBar for this Activity window.
+        // Make sure the toolbar exists in the activity and is not null
+        setSupportActionBar(toolbar);
     }
 
-    private View.OnClickListener onClickListener = new View.OnClickListener() {
-        @Override
-        public void onClick(final View v) {
-            switch(v.getId()){
-                case R.id.from:
-                    txtnumber = 0;
-                    autoComplete();
-                    break;
-                case R.id.to:
-                    txtnumber = 1;
-                    autoComplete();
-                    break;
-                case R.id.search:
-                    txtnumber = 2;
-                    break;
-                case R.id.submit:
-                    if(mFromPlace != null && mToPlace != null){
-                        mHTTPSRequest.getRequest(getURL(mFromPlace.getLatLng(),mToPlace.getLatLng(),"xml"));
-                        mHTTPSRequest.getRequest(getURL(mFromPlace.getLatLng(),mToPlace.getLatLng(),"json"));
-//                        mDocument = mGMapV2Direction.getDocument(mFromPlace.getLatLng(),mToPlace.getLatLng(),mGMapV2Direction.MODE_DRIVING);
-//                        mapDirection();
-                    }
-                    break;
-            }
-        }
-    };
+    // Menu icons are inflated just as they were with actionbar
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
 
-    public String getURL(LatLng start, LatLng end, String type){
-        String url = "http://maps.googleapis.com/maps/api/directions/"+ type +"?"
+    private void initializeLocationManager() {
+
+        //get the location manager
+        this.locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+
+        //define the location manager criteria
+        Criteria criteria = new Criteria();
+
+        this.locationProvider = locationManager.getBestProvider(criteria, false);
+
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        Location location = locationManager.getLastKnownLocation(locationProvider);
+
+
+        //initialize the location
+        if (location != null) {
+
+            onLocationChanged(location);
+        }
+    }
+
+    public String getURL(LatLng start, LatLng end, String type) {
+        String url = "http://maps.googleapis.com/maps/api/directions/" + type + "?"
                 + "origin=" + start.latitude + "," + start.longitude
                 + "&destination=" + end.latitude + "," + end.longitude
                 + "&sensor=false&units=metric&mode=driving";
         return url;
 
     }
-    public void autoComplete(){
+
+    public void autoComplete() {
         try {
             Intent intent =
-                    new PlaceAutocomplete.IntentBuilder(PlaceAutocomplete.MODE_FULLSCREEN)
+                    new PlaceAutocomplete.IntentBuilder(PlaceAutocomplete.MODE_OVERLAY)
                             .build(this);
             startActivityForResult(intent, PLACE_AUTOCOMPLETE_REQUEST_CODE);
         } catch (GooglePlayServicesRepairableException e) {
@@ -147,7 +181,7 @@ public class MapsActivity extends AppCompatActivity
         }
     }
 
-    private void mapDirection(String response){
+    private void mapDirection(String response) {
         Document doc = mGMapV2Direction.getDocument(response);
         final ArrayList<LatLng> directionPoint = mGMapV2Direction.getDirection(doc);
         ArrayList<PointOfInterest> yelpPointsofInterests = null;
@@ -176,12 +210,26 @@ public class MapsActivity extends AppCompatActivity
 
         timer.schedule(task,500);
 
-        PolylineOptions rectLine = new PolylineOptions().width(3).color(R.color.Red);
+        PolylineOptions rectLine = new PolylineOptions().width(10).color(Color.BLUE);
 
         for (int i = 0; i < directionPoint.size(); i++) {
             rectLine.add(directionPoint.get(i));
         }
         Polyline polylin = mMap.addPolyline(rectLine);
+        zoomFunction();
+    }
+
+    public void zoomFunction(){
+        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+        for (Marker marker : mMarkers) {
+            builder.include(marker.getPosition());
+        }
+        LatLngBounds bounds = builder.build();
+
+        int padding = 0; // offset from edges of the map in pixels
+        CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, padding);
+        mMap.moveCamera(cu);
+        mMap.animateCamera(CameraUpdateFactory.zoomTo(mMap.getCameraPosition().zoom - 0.5f));
     }
 
     @Override
@@ -189,17 +237,16 @@ public class MapsActivity extends AppCompatActivity
         if (requestCode == PLACE_AUTOCOMPLETE_REQUEST_CODE) {
             if (resultCode == RESULT_OK) {
                 Place place = PlaceAutocomplete.getPlace(this, data);
-                if (txtnumber == 0){
+                if (txtnumber == 0) {
                     mFromPlace = place;
                     mFrom.setText(mFromPlace.getName());
-                } else if (txtnumber == 1){
+                } else if (txtnumber == 1) {
                     mToPlace = place;
                     mTo.setText(mToPlace.getName());
                 }
-                mMap.addMarker(new MarkerOptions().position(place.getLatLng()).title(place.getName().toString()));
-                CameraPosition cameraPosition = new CameraPosition.Builder().target(place.getLatLng()).zoom(14.0f).build();
-                CameraUpdate cameraUpdate = CameraUpdateFactory.newCameraPosition(cameraPosition);
-                mMap.moveCamera(cameraUpdate);
+//                CameraPosition cameraPosition = new CameraPosition.Builder().target(place.getLatLng()).zoom(14.0f).build();
+//                CameraUpdate cameraUpdate = CameraUpdateFactory.newCameraPosition(cameraPosition);
+//                mMap.moveCamera(cameraUpdate);
 //                Log.i(TAG, "Place: " + place.getName());
             } else if (resultCode == PlaceAutocomplete.RESULT_ERROR) {
                 Status status = PlaceAutocomplete.getStatus(this, data);
@@ -215,7 +262,6 @@ public class MapsActivity extends AppCompatActivity
     @Override
     public void onMapReady(GoogleMap map) {
         mMap = map;
-
         mMap.setOnMyLocationButtonClickListener(this);
         enableMyLocation();
     }
@@ -224,7 +270,7 @@ public class MapsActivity extends AppCompatActivity
      * Enables the My Location layer if the fine location permission has been granted.
      */
     private void enableMyLocation() {
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             // Permission to access the location is missing.
             PermissionUtils.requestPermission(this, LOCATION_PERMISSION_REQUEST_CODE,
@@ -237,12 +283,11 @@ public class MapsActivity extends AppCompatActivity
 
     @Override
     public boolean onMyLocationButtonClick() {
-        Toast.makeText(this, "MyLocation button clicked", Toast.LENGTH_SHORT).show();
+//        Toast.makeText(this, "MyLocation button clicked", Toast.LENGTH_SHORT).show();
         // Return false so that we don't consume the event and the default behavior still occurs
         // (the camera animates to the user's current position).
         return false;
     }
-
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
@@ -295,11 +340,13 @@ public class MapsActivity extends AppCompatActivity
         } else {
             mapDirection(response);
         }
+//        Log.i("Response", response);
+        mapDirection(response);
     }
 
     @Override
     public void requestFailure(String response) {
-
+        showDialog();
     }
 
     public boolean isJSONValid(String test) {
@@ -315,5 +362,128 @@ public class MapsActivity extends AppCompatActivity
             }
         }
         return true;
+    }
+
+    public void showDialog() {
+        // Create an instance of the dialog fragment and show it
+        FormFragment dialog = new FormFragment();
+        dialog.show(getFragmentManager(), "FormFragment");
+        dialog.setCancelable(false);
+        dialog.setRetainInstance(true);
+    }
+
+    @Override
+    public void onDialogPositiveClick(DialogInterface dialog, EditText text) {
+        mSearch = text;
+        if (mFromPlace != null && mToPlace != null) {
+            mHTTPSRequest.getRequest(getURL(mFromPlace.getLatLng(), mToPlace.getLatLng(), "xml"),dialog);
+            mMarkers.add(mMap.addMarker(new MarkerOptions().position(mFromPlace.getLatLng()).title(mFromPlace.getName().toString())));
+            mMarkers.add(mMap.addMarker(new MarkerOptions().position(mToPlace.getLatLng()).title(mToPlace.getName().toString())));
+        }
+
+    }
+
+    @Override
+    public void onDialogNegativeClick(DialogInterface dialog) {
+        dialog.cancel();
+    }
+
+    @Override
+    public void onFromClick(EditText editText) {
+        mFrom = editText;
+        txtnumber = 0;
+        try {
+            synchronized (this) {
+                this.wait(1000);
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        autoComplete();
+    }
+
+    @Override
+    public void onToClick(EditText editText) {
+        mTo = editText;
+        txtnumber = 1;
+        try {
+            synchronized (this) {
+                this.wait(1000);
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        autoComplete();
+    }
+
+    @Override
+    public void onSearchClick(EditText editText) {
+        mSearch = editText;
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        this.locationManager.requestLocationUpdates(this.locationProvider, 400, 1, this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        this.locationManager.removeUpdates(this);
+    }
+
+    //------------------------------------------
+    //	Summary: Location Listener  methods
+    //------------------------------------------
+    @Override
+    public void onLocationChanged(Location location) {
+
+        Log.i("called", "onLocationChanged");
+
+
+        if (mMap != null) {
+            //when the location changes, update the map by zooming to the location
+            CameraUpdate center = CameraUpdateFactory.newLatLng(new LatLng(location.getLatitude(), location.getLongitude()));
+            this.mMap.moveCamera(center);
+
+            CameraUpdate zoom = CameraUpdateFactory.zoomTo(15);
+            this.mMap.animateCamera(zoom);
+        }
+    }
+
+    @Override
+    public void onStatusChanged(String s, int i, Bundle bundle) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String s) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String s) {
+
     }
 }
