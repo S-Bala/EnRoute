@@ -2,12 +2,15 @@ package com.enroutetechnologies.enroute;
 
 import android.util.Log;
 
+import com.google.android.gms.maps.model.LatLng;
 import com.yelp.clientlib.connection.YelpAPI;
 import com.yelp.clientlib.connection.YelpAPIFactory;
+import com.yelp.clientlib.entities.Business;
 import com.yelp.clientlib.entities.SearchResponse;
 import com.yelp.clientlib.entities.options.CoordinateOptions;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,49 +28,82 @@ public class YelpConnection {
     private String mConsumerSecret = "1zdvEkbi3ToCQ5VtkNjl813eSeU";
     private String mToken = "3d24sy-UTDV3zXwcXJlSiRS635a2HzPM";
     private String mTokenSecret = "BamVqH-13iphIMF9vx5Fc6zjN7A";
+    private SearchResponse searchResponse;
+    private ArrayList pointsOfInterests = new ArrayList();
+    public int counter = 0;
 
     YelpAPIFactory apiFactory = new YelpAPIFactory(mConsumerKey, mConsumerSecret, mToken, mTokenSecret);
     YelpAPI yelpAPI = apiFactory.createAPI();
 
-    public void getRequest(String searchItem, double latitude, double longitude, double radius) throws IOException {
+    public ArrayList getPointsOfInterests(final String searchItem, ArrayList<LatLng> directionPoint,
+                                          double radius) throws IOException {
 
-        Map<String, String> params = new HashMap<>();
+        ArrayList mCleanData = getCleanData(directionPoint);
 
-        // general search params
-        params.put("term", searchItem);
-        params.put("limit", "3");
-        params.put("radius_filter", String.valueOf(radius));
+        for(int i = 0; i < mCleanData.size(); i++){
 
-        // set up location boundary
-        CoordinateOptions coordinate = CoordinateOptions.builder()
-                .latitude(latitude)
-                .longitude(longitude).build();
+            final LatLng record = (LatLng) mCleanData.get(i);
+            double latitude = record.latitude;
+            double longitude = record.longitude;
 
-        Call<SearchResponse> call = yelpAPI.search(coordinate, params);
+            Map<String, String> params = new HashMap<>();
 
-        Callback<SearchResponse> callback = new Callback<SearchResponse>() {
-            @Override
-            public void onResponse(Call<SearchResponse> call, Response<SearchResponse> response) {
-                SearchResponse searchResponse = response.body();
-                Log.i("YELP", searchResponse.toString());
-            }
-            @Override
-            public void onFailure(Call<SearchResponse> call, Throwable t) {
-                Log.i("YELP", "FAILED");
-                Log.i("YELP", t.getMessage());
-            }
-        };
+            // general search params
+            params.put("term", searchItem);
+            params.put("limit", "5");
+            params.put("radius_filter", String.valueOf(radius));
 
-        call.enqueue(callback);
+            // set up location boundary
+            CoordinateOptions coordinate = CoordinateOptions.builder()
+                    .latitude(latitude)
+                    .longitude(longitude).build();
 
+            final Call<SearchResponse> call = yelpAPI.search(coordinate, params);
 
+            final Callback<SearchResponse> callback = new Callback<SearchResponse>() {
+                @Override
+                public void onResponse(Call<SearchResponse> call, Response<SearchResponse> response) {
+                    counter += 1;
+                    searchResponse = response.body();
+                    ArrayList<Business> businesses = searchResponse.businesses();
 
+                    for (Business business : businesses) {
+                        PointOfInterest poi = new PointOfInterest(business.id(),
+                                business.name(), business.displayPhone(), business.imageUrl(),
+                                business.isClosed(), business.location(), business.rating());
 
+                        pointsOfInterests.add(poi);
+                    }
 
+                }
+                @Override
+                public void onFailure(Call<SearchResponse> call, Throwable t) {
+                    counter += 1;
+                    Log.i("YELP", "FAILED");
+                    Log.i("YELP", t.getMessage());
+                    searchResponse = null;
+                }
+            };
+
+            call.enqueue(callback);
+
+        }
+
+        return pointsOfInterests;
 
     }
 
+    public ArrayList getCleanData(ArrayList dirtyList){
+        ArrayList cleanList = new ArrayList();
+        for(int i = 0; i < dirtyList.size(); i+=(dirtyList.size()/20)){
+            cleanList.add(dirtyList.get(i));
+        }
+        return cleanList;
+    }
+
+    public ArrayList getPointsOfInterests() {
+        return pointsOfInterests;
+    }
 
 }
-
 

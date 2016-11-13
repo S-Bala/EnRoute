@@ -19,7 +19,6 @@ import com.google.android.gms.maps.model.PolylineOptions;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.provider.DocumentsContract;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -30,7 +29,11 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
+
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -73,8 +76,9 @@ public class MapsActivity extends AppCompatActivity
     private Place mFromPlace;
     private Place mToPlace;
     private Button mButton;
-    private Document mDocument;
     private HTTPSRequest mHTTPSRequest;
+    private YelpConnection yelpConnection;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -145,8 +149,33 @@ public class MapsActivity extends AppCompatActivity
 
     private void mapDirection(String response){
         Document doc = mGMapV2Direction.getDocument(response);
+        final ArrayList<LatLng> directionPoint = mGMapV2Direction.getDirection(doc);
+        ArrayList<PointOfInterest> yelpPointsofInterests = null;
 
-        ArrayList<LatLng> directionPoint = mGMapV2Direction.getDirection(doc);
+        yelpConnection = new YelpConnection();
+        String searchItem = mSearch.getText().toString();
+        try {
+            yelpPointsofInterests = yelpConnection.getPointsOfInterests(searchItem, directionPoint, 2000);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        final Timer timer = new Timer();
+
+        final TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                while(yelpConnection.counter < 21){
+                    Log.e("id",Integer.toString(yelpConnection.counter));
+                }
+                ArrayList<PointOfInterest> pointOfInterestsArray = yelpConnection.getPointsOfInterests();
+                timer.cancel();
+                timer.purge();
+            }
+        };
+
+        timer.schedule(task,500);
+
         PolylineOptions rectLine = new PolylineOptions().width(3).color(R.color.Red);
 
         for (int i = 0; i < directionPoint.size(); i++) {
@@ -252,9 +281,17 @@ public class MapsActivity extends AppCompatActivity
 
     @Override
     public void requestSuccess(String response) {
-        Log.i("Response", response);
         if (isJSONValid(response)){
-
+            try {
+                Log.i("GMaps Response", response);
+                JSONObject jObject  = new JSONObject(response);
+//                JSONObject routes = jObject.getJSONObject("geocoded_waypoints");
+//                Log.i("HELLOO", routes.toString());
+//                JSONObject legs = routes.getJSONObject("legs");
+//                Log.i("HELLOO123", legs.toString());
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
         } else {
             mapDirection(response);
         }
